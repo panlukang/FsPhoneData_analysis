@@ -18,6 +18,10 @@ def filter_od_df(start_grid_field=None, end_grid_field=None,
                  target_region_df=None,
                  region_grid_id_field=None,
                  _type='any', od_df=None):
+    '''
+    出行量表与栅格中心点表连接，筛选佛山市内外，并加入起终点经纬度信息
+    '''
+    
     # start 和 end 有一个在target_grid_id_list内
     filter_od_df = pd.merge(od_df, target_region_df[[region_grid_id_field, 'name', 'lon', 'lat']],
                             left_on=[start_grid_field], right_on=[region_grid_id_field],
@@ -34,7 +38,7 @@ def filter_od_df(start_grid_field=None, end_grid_field=None,
     filter_od_df.drop(columns=[region_grid_id_field], axis=1, inplace=True)
     filter_od_df.rename(columns={'name': 'end_name', 'lon': 'end_lng', 'lat': 'end_lat'}, inplace=True)
 
-    filter_od_df.dropna(subset=['start_name', 'end_name'], how='all', inplace=True)
+    filter_od_df.dropna(subset=['start_name', 'end_name'], how='all', inplace=True)  # 无用
     filter_od_df.reset_index(inplace=True, drop=True)
 
     return filter_od_df
@@ -84,6 +88,12 @@ def generate_region_grid():
 
 
 def clean_move_df(move_df=None, flag=None, loc_gdf=None):
+    """
+    清洗输入出行数据
+    :param move_df: 输入出行数据
+    :param loc_gdf: 栅格中心点数据
+    :param flag: 编号
+    """
 
     print(move_df['date'].unique())
     print(move_df['mode'].unique())
@@ -102,7 +112,7 @@ def clean_move_df(move_df=None, flag=None, loc_gdf=None):
 
     # 计算每个出行的直线距离, 按照日期来切
     filter_move_df.reset_index(inplace=True, drop=True)
-    N = 10
+    N = 6
     pool = multiprocessing.Pool(processes=N)
     results = []
 
@@ -136,13 +146,15 @@ if __name__ == '__main__':
 
     print(r'读取栅格......')
     data_fldr = r'./data/input/'
-    grid_gdf = gpd.read_file(r'./data/input/grid_wgs.shp')
+    with open(r'./data/input/gz_grid_wgs', 'rb') as f:
+        grid_gdf = pickle.load(f)
+    # grid_gdf = gpd.read_file(r'./data/input/grid_wgs.shp')
     grid_gdf['lon'] = grid_gdf['geometry'].apply(lambda x: x.x)
     grid_gdf['lat'] = grid_gdf['geometry'].apply(lambda x: x.y)
     print(grid_gdf)
 
     # 1.清洗出行数据
-    movement_inner_file_list = []
+    movement_inner_file_list = []  # 建立空列表存储文件名，便于后续遍历清洗
     movement_in_out_file_list = []
     movement_out_in_file_list = []
     for file in os.listdir(data_fldr):
@@ -162,10 +174,12 @@ if __name__ == '__main__':
         print(file)
         i += 1
         df = pd.read_csv(os.path.join(data_fldr, file))
+        # 判断是否有'last_grid'字段，没有则添加字段并设置为-1，便于后续统一处理
         if 'last_grid' in list(df.columns):
             pass
         else:
             df['last_grid'] = -1
+        # 清洗
         clean_move_df(move_df=df, loc_gdf=grid_gdf, flag=i)
 
 

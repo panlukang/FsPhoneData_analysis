@@ -54,18 +54,26 @@ if __name__ == '__main__':
 
     # 计算人口
     # 1.计算各区的人口
-    data_fldr = r'./data/input/'
+    data_fldr = r'./data/input/'  # 输入文件路径
     print(r'读取栅格......')
-    grid_gdf = gpd.read_file(r'./data/input/grid_wgs.shp')
+
+    grid_gdf = gpd.read_file(r'./data/input/grid_wgs.shp')   # 栅格中心点矢量
     print(grid_gdf)
-    home_df = pd.read_csv(os.path.join(data_fldr, r'zc_v5_home_detail_count.csv'))
+
+    home_df = pd.read_csv(os.path.join(data_fldr, r'zc_v5_home_detail_count.csv'))  # 居住人口原数据
+
+    # 合并数据表，在home_df中加入栅格中心点数据的行政区信息
     home_df = pd.merge(home_df, grid_gdf[['grid_id', 'name']], left_on='home_grid', right_on='grid_id',
-                       how='left')
+                       how='left')  
     # 去除name为空的(不是居住佛山的)
     home_df.dropna(subset=['name'], axis=0, inplace=True)
+    # 聚合统计各区划人口数
     region_pop_df = home_df.groupby(['name'])[['count']].sum().reset_index(drop=False)
+    # 总人口数
     all_pop = region_pop_df['count'].sum()
+    # 插入一行总人口
     region_pop_df.loc[len(region_pop_df), :] = {'name': '佛山', 'count': all_pop}
+    # 转存聚合的人口数据为字典
     region_name_pop_dict = {name: pop for name, pop in zip(region_pop_df['name'],
                                                            region_pop_df['count'])}
     del home_df
@@ -73,8 +81,9 @@ if __name__ == '__main__':
     del grid_gdf
     print(region_name_pop_dict)
 
-
+    # 创建空数据表，存入清洗后的移动数据
     move_df = pd.DataFrame()
+
     for i in range(1, 9):
         print(i)
         with open(rf'./data/input/clean/fs_move_{i}.df', 'rb') as f:
@@ -83,16 +92,16 @@ if __name__ == '__main__':
                             'last_grid'],
                    inplace=True, axis=1)
             move_df = move_df._append(_)
+    del _  # 为什么不写在循环内？
 
-    del _
     move_df.reset_index(inplace=True, drop=True)
     print(len(move_df))
 
     # 计算按照次数平均的出行距离
     print(move_df['start_name'].unique())
-    move_df = move_df[move_df['start_name'].isin(['三水区', '南海区', '高明区', '顺德区', '禅城区'])].copy()
-    move_df = move_df[move_df['dis'] >= 100]
-    move_df['dis'] = move_df['count'] * move_df['dis']
+    move_df = move_df[move_df['start_name'].isin(['三水区', '南海区', '高明区', '顺德区', '禅城区'])].copy()  # 切片佛山市区
+    move_df = move_df[move_df['dis'] >= 100]    # 切片距离>=100
+    move_df['dis'] = move_df['count'] * move_df['dis']   # 距离*人数，总出行距离？？
     region_avg_dis_ds_mode_df, region_avg_dis_ds_df = calc_avg_dis(df=move_df, ds_field='date',
                                                                    mode_field='mode_name',
                                                                    from_name_field='start_name',
