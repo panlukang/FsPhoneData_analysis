@@ -129,7 +129,7 @@ if __name__ == '__main__':
     print(movement_in_out_file_list)
 
     N = 10  # 切片数
-    i = 3
+    i = 1
 
     for file in movement_inner_file_list + movement_out_in_file_list + movement_in_out_file_list:
         print(file)
